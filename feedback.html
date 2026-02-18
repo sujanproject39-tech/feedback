@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hospital Feedback</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif;}
+
+body{
+height:100vh;display:flex;justify-content:center;align-items:center;
+background:linear-gradient(-45deg,#ff9a9e,#fecfef,#fad0c4,#fbc2eb);
+background-size:400% 400%;
+animation:gradientBG 12s ease infinite;
+}
+
+@keyframes gradientBG{
+0%{background-position:0% 50%;}
+50%{background-position:100% 50%;}
+100%{background-position:0% 50%;}
+}
+
+.form-container{
+width:400px;padding:30px;background:rgba(255,255,255,0.25);
+backdrop-filter:blur(15px);
+border-radius:20px;
+box-shadow:0 8px 32px rgba(255,0,150,0.3);
+animation:fadeIn 1s ease;
+}
+
+@keyframes fadeIn{
+from{opacity:0;transform:translateY(30px);}
+to{opacity:1;transform:translateY(0);}
+}
+
+h2{text-align:center;color:#d63384;margin-bottom:15px;}
+
+input,textarea{
+width:100%;padding:10px;margin-top:8px;margin-bottom:15px;
+border:none;border-radius:10px;outline:none;
+}
+
+/* ⭐ Star Rating */
+.star-container{
+text-align:center;
+margin-bottom:15px;
+}
+
+.star{
+font-size:30px;
+cursor:pointer;
+color:#ccc;
+transition:0.3s;
+}
+
+.star:hover,
+.star.active{
+color:#ff4da6;
+transform:scale(1.2);
+}
+
+button{
+width:100%;padding:12px;border:none;border-radius:30px;
+background:linear-gradient(45deg,#ff4da6,#ff85c1);
+color:white;font-weight:600;cursor:pointer;
+transition:0.3s;
+}
+
+button:hover{transform:translateY(-3px);}
+
+.message{text-align:center;margin-top:10px;font-size:14px;}
+</style>
+</head>
+
+<body>
+
+<div class="form-container">
+<h2>Patient Feedback</h2>
+
+<form id="feedbackForm">
+<input type="text" id="hospital" placeholder="Hospital Name" required>
+<input type="text" id="patientName" placeholder="Patient Name" required>
+<textarea id="issue" placeholder="Patient Issue" required></textarea>
+<textarea id="feedback" placeholder="Your Feedback" required></textarea>
+
+<div class="star-container">
+<span class="star" data-value="1">★</span>
+<span class="star" data-value="2">★</span>
+<span class="star" data-value="3">★</span>
+<span class="star" data-value="4">★</span>
+<span class="star" data-value="5">★</span>
+</div>
+
+<button type="submit">Submit Feedback</button>
+<div id="message" class="message"></div>
+</form>
+</div>
+
+<script>
+const supabaseClient = supabase.createClient(
+"https://zhnamyobwlyrommgpedi.supabase.co",
+"sb_publishable_FKBkWP3UPo-Qtobv7gjW4A_gvNxLsFh"
+);
+
+let selectedRating = 0;
+const stars = document.querySelectorAll(".star");
+
+stars.forEach(star => {
+star.addEventListener("click", function(){
+selectedRating = this.getAttribute("data-value");
+stars.forEach(s => s.classList.remove("active"));
+for(let i=0; i<selectedRating; i++){
+stars[i].classList.add("active");
+}
+});
+});
+
+document.getElementById("feedbackForm").addEventListener("submit", async (e)=>{
+e.preventDefault();
+
+if(selectedRating == 0){
+alert("Please select a star rating!");
+return;
+}
+
+const { error } = await supabaseClient.from("Feedback").insert([
+{
+HospitalName: document.getElementById("hospital").value,
+PatientName: document.getElementById("patientName").value,
+PatientIssue: document.getElementById("issue").value,
+PatientFeedback: document.getElementById("feedback").value,
+FeedbackStatus: "Pending",
+Rating: selectedRating
+}
+]);
+
+const msg = document.getElementById("message");
+
+if(error){
+msg.innerHTML = "❌ Error submitting feedback";
+msg.style.color = "red";
+}else{
+msg.innerHTML = "💗 Feedback Submitted Successfully!";
+msg.style.color = "green";
+document.getElementById("feedbackForm").reset();
+stars.forEach(s => s.classList.remove("active"));
+selectedRating = 0;
+}
+});
+</script>
+
+</body>
+</html>
