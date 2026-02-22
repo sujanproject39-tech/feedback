@@ -43,7 +43,6 @@ transition:0.3s;
 }
 .logout-btn:hover{transform:translateY(-2px);}
 
-/* Search */
 .search-box{
 margin-bottom:15px;
 width:100%;
@@ -58,7 +57,6 @@ border:none;
 outline:none;
 }
 
-/* Status Tabs */
 .tabs{
 display:flex;
 justify-content:center;
@@ -80,11 +78,9 @@ background:#ff4da6;
 color:white;
 }
 
-/* Rating Tabs */
 .rating-tabs{
 text-align:center;
 margin-bottom:15px;
-flex-wrap:wrap;
 }
 .rating-btn{
 padding:6px 12px;
@@ -99,7 +95,22 @@ background:#ff85c1;
 color:white;
 }
 
-/* Table */
+.delete-container{
+text-align:center;
+margin-bottom:10px;
+}
+
+.delete-btn{
+display:none;
+background:#ff1744;
+color:white;
+border:none;
+padding:8px 15px;
+border-radius:20px;
+cursor:pointer;
+font-weight:600;
+}
+
 table{
 width:100%;
 border-collapse:collapse;
@@ -135,15 +146,12 @@ color:#ff4da6;
 font-size:16px;
 }
 
-/* Responsive Table for Mobile */
 @media screen and (max-width: 800px){
 table, thead, tbody, th, td, tr{
 display:block;
 }
 
-thead tr{
-display:none;
-}
+thead tr{display:none;}
 
 tr{
 margin-bottom:15px;
@@ -166,9 +174,7 @@ left:10px;
 font-weight:600;
 color:#d63384;
 }
-.status-select{
-width:90%;
-}
+.status-select{width:90%;}
 }
 </style>
 </head>
@@ -199,9 +205,14 @@ width:90%;
 <button class="rating-btn" onclick="filterRating(5,this)">5★</button>
 </div>
 
+<div class="delete-container">
+<button id="deleteBtn" class="delete-btn" onclick="deleteSelected()">🗑 Delete Selected</button>
+</div>
+
 <table>
 <thead>
 <tr>
+<th>Select</th>
 <th>ID</th>
 <th>Hospital</th>
 <th>Patient</th>
@@ -225,28 +236,41 @@ let currentRating=0;
 
 async function loadFeedback(){
 
-let query = supabaseClient.from("Feedback").select("*").eq("FeedbackStatus", currentStatus).order("id",{ascending:false});
+let query = supabaseClient
+.from("Feedback")
+.select("*")
+.eq("FeedbackStatus", currentStatus)
+.order("id",{ascending:false});
 
-if(currentRating>0) query = query.eq("Rating",currentRating);
+if(currentRating>0)
+query=query.eq("Rating",currentRating);
 
 const { data, error } = await query;
 
-if(error){ alert("Error loading data"); return; }
+if(error){
+alert("Error loading data");
+return;
+}
 
 const searchValue = document.getElementById("searchInput").value.toLowerCase();
-
 const tableBody = document.getElementById("tableBody");
 tableBody.innerHTML="";
 
 data.forEach(row=>{
-if(row.HospitalName.toLowerCase().includes(searchValue) ||
+
+if(
+row.HospitalName.toLowerCase().includes(searchValue) ||
 row.PatientName.toLowerCase().includes(searchValue) ||
-row.PatientIssue.toLowerCase().includes(searchValue)){
+row.PatientIssue.toLowerCase().includes(searchValue)
+){
 
 const stars="★".repeat(row.Rating||0);
 
 tableBody.innerHTML+=`
 <tr>
+<td data-label="Select">
+<input type="checkbox" class="row-checkbox" value="${row.id}" onchange="toggleDeleteButton()">
+</td>
 <td data-label="ID">${row.id}</td>
 <td data-label="Hospital">${row.HospitalName}</td>
 <td data-label="Patient">${row.PatientName}</td>
@@ -263,7 +287,10 @@ tableBody.innerHTML+=`
 </tr>
 `;
 }
+
 });
+
+document.getElementById("deleteBtn").style.display="none";
 }
 
 function switchTab(status,btn){
@@ -280,8 +307,37 @@ btn.classList.add("active");
 loadFeedback();
 }
 
+function toggleDeleteButton(){
+const checked=document.querySelectorAll(".row-checkbox:checked").length;
+document.getElementById("deleteBtn").style.display=checked>0?"inline-block":"none";
+}
+
+async function deleteSelected(){
+
+const selected=Array.from(document.querySelectorAll(".row-checkbox:checked"))
+.map(cb=>parseInt(cb.value));
+
+if(selected.length===0) return;
+
+if(!confirm("Are you sure you want to delete selected feedback?")) return;
+
+const { error } = await supabaseClient
+.from("Feedback")
+.delete()
+.in("id",selected);
+
+if(error){
+alert("Error deleting data");
+}else{
+alert("Deleted successfully!");
+loadFeedback();
+}
+}
+
 async function updateStatus(id,newStatus){
-await supabaseClient.from("Feedback").update({FeedbackStatus:newStatus}).eq("id",id);
+await supabaseClient.from("Feedback")
+.update({FeedbackStatus:newStatus})
+.eq("id",id);
 loadFeedback();
 }
 
