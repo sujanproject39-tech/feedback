@@ -68,7 +68,7 @@ margin:5px;
 border-radius:20px;
 font-weight:600;
 }
-.tab-btn.active{
+.tab-btn:hover{
 background:#ff4da6;
 color:white;
 }
@@ -139,11 +139,22 @@ font-size:12px;
 <input type="text" id="searchInput" placeholder="Search..." onkeyup="loadFeedback()">
 </div>
 
+<!-- STATUS FILTER -->
 <div class="tabs">
 <button class="tab-btn active" onclick="switchTab('ALL',this)">ALL</button>
 <button class="tab-btn" onclick="switchTab('Pending',this)">Pending</button>
 <button class="tab-btn" onclick="switchTab('In Progress',this)">In Progress</button>
 <button class="tab-btn" onclick="switchTab('Solved',this)">Solved</button>
+</div>
+
+<!-- ⭐ RATING FILTER -->
+<div class="tabs">
+<button class="tab-btn active" onclick="switchRating('ALL',this)">All Ratings</button>
+<button class="tab-btn" onclick="switchRating(5,this)">5 ★</button>
+<button class="tab-btn" onclick="switchRating(4,this)">4 ★</button>
+<button class="tab-btn" onclick="switchRating(3,this)">3 ★</button>
+<button class="tab-btn" onclick="switchRating(2,this)">2 ★</button>
+<button class="tab-btn" onclick="switchRating(1,this)">1 ★</button>
 </div>
 
 <div class="delete-container">
@@ -176,7 +187,9 @@ const supabaseClient = supabase.createClient(
 );
 
 let currentStatus="ALL";
+let currentRating="ALL";
 
+/* ================= LOAD DATA ================= */
 async function loadFeedback(){
 
 let query = supabaseClient
@@ -198,9 +211,15 @@ tableBody.innerHTML="";
 data.forEach(row=>{
 
 if(
+(
 row.HospitalName.toLowerCase().includes(searchValue) ||
 row.PatientName.toLowerCase().includes(searchValue) ||
 row.PatientIssue.toLowerCase().includes(searchValue)
+)
+&&
+(
+currentRating==="ALL" || row.Rating==currentRating
+)
 ){
 
 const stars="★".repeat(row.Rating||0);
@@ -236,6 +255,25 @@ Download
 document.getElementById("deleteBtn").style.display="none";
 }
 
+/* ================= STATUS FILTER ================= */
+function switchTab(status,btn){
+currentStatus=status;
+document.querySelectorAll(".tabs:first-of-type .tab-btn")
+.forEach(b=>b.classList.remove("active"));
+btn.classList.add("active");
+loadFeedback();
+}
+
+/* ================= RATING FILTER ================= */
+function switchRating(rating,btn){
+currentRating=rating;
+document.querySelectorAll(".tabs:nth-of-type(2) .tab-btn")
+.forEach(b=>b.classList.remove("active"));
+btn.classList.add("active");
+loadFeedback();
+}
+
+/* ================= DELETE ================= */
 function toggleDeleteButton(){
 const checked=document.querySelectorAll(".row-checkbox:checked").length;
 document.getElementById("deleteBtn").style.display=checked>0?"inline-block":"none";
@@ -263,13 +301,7 @@ loadFeedback();
 }
 }
 
-function switchTab(status,btn){
-currentStatus=status;
-document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
-btn.classList.add("active");
-loadFeedback();
-}
-
+/* ================= UPDATE STATUS ================= */
 async function updateStatus(id,newStatus){
 await supabaseClient.from("Feedback")
 .update({FeedbackStatus:newStatus})
@@ -277,6 +309,7 @@ await supabaseClient.from("Feedback")
 loadFeedback();
 }
 
+/* ================= PDF FUNCTION (UNCHANGED) ================= */
 function downloadPDF(row){
 
 const doc = new jsPDF({
@@ -285,95 +318,114 @@ const doc = new jsPDF({
   format: "a4"
 });
 
-const today = new Date().toLocaleDateString();
 const pageWidth = doc.internal.pageSize.getWidth();
+const pageHeight = doc.internal.pageSize.getHeight();
+const today = new Date().toLocaleDateString();
 
-/* ====== HEADER ====== */
-doc.setFillColor(102, 0, 153); // deep hospital purple
+/* =======================================================
+   🔷 HEADER SECTION (Medical Premium Blue Gradient Style)
+======================================================= */
+doc.setFillColor(0, 102, 204);
 doc.rect(0, 0, pageWidth, 30, "F");
 
 doc.setFont("helvetica","bold");
-doc.setFontSize(24);
+doc.setFontSize(26);
 doc.setTextColor(255,255,255);
-doc.text("HOSPITAL FEEDBACK REPORT", 14, 18);
+doc.text("HOSPITAL FEEDBACK REPORT", 15, 18);
 
-doc.setFontSize(12);
-doc.text(`Generated on: ${today}`, pageWidth - 70, 18);
+doc.setFontSize(11);
+doc.text("Generated on: " + today, pageWidth - 60, 18);
 
-/* ====== CARD BACKGROUND ====== */
-doc.setFillColor(245, 240, 255);
-doc.roundedRect(10, 40, pageWidth-20, 45, 5, 5, "F");
+/* =======================================================
+   🏥 HOSPITAL INFORMATION CARD
+======================================================= */
+doc.setFillColor(240, 248, 255);
+doc.roundedRect(10, 40, pageWidth-20, 35, 5, 5, "F");
 
-/* ====== HOSPITAL INFO ====== */
-doc.setTextColor(102,0,153);
 doc.setFontSize(16);
+doc.setTextColor(0, 102, 204);
 doc.text("Hospital Information", 15, 50);
 
+doc.setFontSize(13);
 doc.setTextColor(0,0,0);
 doc.setFont("helvetica","normal");
-doc.setFontSize(13);
 
-doc.text(`Hospital Name: ${row.HospitalName}`, 15, 60);
-doc.text(`Patient Name: ${row.PatientName}`, 15, 68);
-doc.text(`Status: ${row.FeedbackStatus}`, 15, 76);
+doc.text("Hospital Name: " + row.HospitalName, 15, 60);
+doc.text("Patient Name: " + row.PatientName, 15, 68);
+doc.text("Current Status: " + row.FeedbackStatus, 15, 76);
 
-/* ====== STAR RATING ====== */
-let startX = 15;
-let startY = 85;
-
+/* =======================================================
+   ⭐ RATING SECTION (Golden Star Display)
+======================================================= */
+doc.setFont("helvetica","bold");
 doc.setFontSize(16);
-doc.setTextColor(255, 193, 7); // gold stars
+doc.setTextColor(255, 140, 0);
+doc.text("Patient Rating", 15, 95);
+
+let starX = 15;
+doc.setFontSize(22);
 
 for(let i=1; i<=5; i++){
   if(i <= row.Rating){
-    doc.text("*", startX, startY);
+    doc.setTextColor(255, 193, 7);
+    doc.text("*", starX, 105);
   } else {
     doc.setTextColor(200,200,200);
-    doc.text("*", startX, startY);
-    doc.setTextColor(255,193,7);
+    doc.text("*", starX, 105);
   }
-  startX += 8;
+  starX += 10;
 }
 
-/* ====== ISSUE SECTION ====== */
-doc.setFillColor(255, 230, 240);
-doc.roundedRect(10, 95, pageWidth-20, 45, 5, 5, "F");
+/* =======================================================
+   🩺 PATIENT ISSUE SECTION
+======================================================= */
+doc.setFillColor(255, 245, 245);
+doc.roundedRect(10, 115, pageWidth-20, 40, 6, 6, "F");
 
-doc.setTextColor(214,51,132);
-doc.setFontSize(16);
-doc.text("Patient Issue", 15, 105);
+doc.setFontSize(15);
+doc.setTextColor(220, 53, 69);
+doc.text("Patient Issue", 15, 125);
 
-doc.setFontSize(13);
+doc.setFontSize(12);
 doc.setTextColor(0,0,0);
 
-const issueLines = doc.splitTextToSize(row.PatientIssue, pageWidth-30);
-doc.text(issueLines, 15, 115);
+const issueText = doc.splitTextToSize(row.PatientIssue, pageWidth-30);
+doc.text(issueText, 15, 135);
 
-/* ====== FEEDBACK SECTION ====== */
-doc.setFillColor(230, 255, 250);
-doc.roundedRect(10, 150, pageWidth-20, 45, 5, 5, "F");
+/* =======================================================
+   💬 PATIENT FEEDBACK SECTION
+======================================================= */
+doc.setFillColor(240, 255, 240);
+doc.roundedRect(10, 165, pageWidth-20, 40, 6, 6, "F");
 
-doc.setTextColor(0,150,136);
-doc.setFontSize(16);
-doc.text("Patient Feedback", 15, 160);
+doc.setFontSize(15);
+doc.setTextColor(0, 150, 136);
+doc.text("Patient Feedback", 15, 175);
 
-doc.setFontSize(13);
+doc.setFontSize(12);
 doc.setTextColor(0,0,0);
 
-const feedbackLines = doc.splitTextToSize(row.PatientFeedback, pageWidth-30);
-doc.text(feedbackLines, 15, 170);
+const feedbackText = doc.splitTextToSize(row.PatientFeedback, pageWidth-30);
+doc.text(feedbackText, 15, 185);
 
-/* ====== FOOTER ====== */
+/* =======================================================
+   🔹 FOOTER (Professional Hospital Authority Style)
+======================================================= */
 doc.setDrawColor(180,180,180);
-doc.line(10, 195, pageWidth-10, 195);
+doc.line(10, pageHeight - 15, pageWidth - 10, pageHeight - 15);
 
 doc.setFontSize(10);
 doc.setTextColor(120,120,120);
-doc.text("Confidential Hospital Document • Authorized Admin Use Only", 15, 202);
+doc.text(
+"Confidential Medical Document • Authorized Administrative Access Only",
+15,
+pageHeight - 8
+);
 
-doc.save(`Hospital_Feedback_${row.id}.pdf`);
+doc.save("Hospital_Feedback_" + row.id + ".pdf");
 }
 
+/* ================= LOGOUT ================= */
 function logout(){
 alert("Logged out successfully!");
 window.location.href="index.html";
