@@ -3,8 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <title>Admin Dashboard</title>
+
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
 body{
@@ -29,7 +31,7 @@ flex-wrap:wrap;
 margin-bottom:15px;
 }
 
-h2{color:#d63384;margin-bottom:10px;}
+h2{color:#d63384;}
 
 .logout-btn{
 background:#ff4d6d;
@@ -39,15 +41,9 @@ padding:8px 15px;
 border-radius:20px;
 cursor:pointer;
 font-weight:600;
-transition:0.3s;
 }
-.logout-btn:hover{transform:translateY(-2px);}
 
-.search-box{
-margin-bottom:15px;
-width:100%;
-text-align:center;
-}
+.search-box{text-align:center;margin-bottom:15px;}
 .search-box input{
 padding:10px;
 width:90%;
@@ -71,27 +67,9 @@ background:#ffd6e8;
 margin:5px;
 border-radius:20px;
 font-weight:600;
-transition:0.3s;
 }
 .tab-btn.active{
 background:#ff4da6;
-color:white;
-}
-
-.rating-tabs{
-text-align:center;
-margin-bottom:15px;
-}
-.rating-btn{
-padding:6px 12px;
-margin:4px;
-border:none;
-border-radius:15px;
-cursor:pointer;
-background:#ffe6f2;
-}
-.rating-btn.active{
-background:#ff85c1;
 color:white;
 }
 
@@ -118,8 +96,6 @@ background:white;
 border-radius:15px;
 overflow:hidden;
 box-shadow:0 8px 20px rgba(255,0,150,0.3);
-table-layout:fixed;
-word-wrap:break-word;
 }
 
 th,td{
@@ -138,43 +114,16 @@ padding:5px;
 border-radius:8px;
 border:none;
 background:#ffe6f2;
-width:100%;
 }
 
-.star{
-color:#ff4da6;
-font-size:16px;
-}
-
-@media screen and (max-width: 800px){
-table, thead, tbody, th, td, tr{
-display:block;
-}
-
-thead tr{display:none;}
-
-tr{
-margin-bottom:15px;
+.download-btn{
+background:#6c5ce7;
+color:white;
+border:none;
+padding:6px 10px;
 border-radius:15px;
-background:white;
-box-shadow:0 6px 15px rgba(255,0,150,0.2);
-padding:10px;
-}
-
-td{
-text-align:left;
-padding:5px 10px;
-position:relative;
-}
-
-td::before{
-content:attr(data-label);
-position:absolute;
-left:10px;
-font-weight:600;
-color:#d63384;
-}
-.status-select{width:90%;}
+cursor:pointer;
+font-size:12px;
 }
 </style>
 </head>
@@ -187,22 +136,14 @@ color:#d63384;
 </div>
 
 <div class="search-box">
-<input type="text" id="searchInput" placeholder="Search Hospital / Patient / Issue..." onkeyup="loadFeedback()">
+<input type="text" id="searchInput" placeholder="Search..." onkeyup="loadFeedback()">
 </div>
 
 <div class="tabs">
-<button class="tab-btn active" onclick="switchTab('Pending',this)">Pending</button>
+<button class="tab-btn active" onclick="switchTab('ALL',this)">ALL</button>
+<button class="tab-btn" onclick="switchTab('Pending',this)">Pending</button>
 <button class="tab-btn" onclick="switchTab('In Progress',this)">In Progress</button>
 <button class="tab-btn" onclick="switchTab('Solved',this)">Solved</button>
-</div>
-
-<div class="rating-tabs">
-<button class="rating-btn active" onclick="filterRating(0,this)">All</button>
-<button class="rating-btn" onclick="filterRating(1,this)">1★</button>
-<button class="rating-btn" onclick="filterRating(2,this)">2★</button>
-<button class="rating-btn" onclick="filterRating(3,this)">3★</button>
-<button class="rating-btn" onclick="filterRating(4,this)">4★</button>
-<button class="rating-btn" onclick="filterRating(5,this)">5★</button>
 </div>
 
 <div class="delete-container">
@@ -220,40 +161,38 @@ color:#d63384;
 <th>Feedback</th>
 <th>Rating</th>
 <th>Status</th>
+<th>PDF</th>
 </tr>
 </thead>
 <tbody id="tableBody"></tbody>
 </table>
 
 <script>
+const { jsPDF } = window.jspdf;
+
 const supabaseClient = supabase.createClient(
 "https://zhnamyobwlyrommgpedi.supabase.co",
 "sb_publishable_FKBkWP3UPo-Qtobv7gjW4A_gvNxLsFh"
 );
 
-let currentStatus="Pending";
-let currentRating=0;
+let currentStatus="ALL";
 
 async function loadFeedback(){
 
 let query = supabaseClient
 .from("Feedback")
 .select("*")
-.eq("FeedbackStatus", currentStatus)
 .order("id",{ascending:false});
 
-if(currentRating>0)
-query=query.eq("Rating",currentRating);
-
-const { data, error } = await query;
-
-if(error){
-alert("Error loading data");
-return;
+if(currentStatus!=="ALL"){
+query=query.eq("FeedbackStatus",currentStatus);
 }
 
-const searchValue = document.getElementById("searchInput").value.toLowerCase();
-const tableBody = document.getElementById("tableBody");
+const { data, error } = await query;
+if(error){ alert("Error loading data"); return; }
+
+const searchValue=document.getElementById("searchInput").value.toLowerCase();
+const tableBody=document.getElementById("tableBody");
 tableBody.innerHTML="";
 
 data.forEach(row=>{
@@ -268,43 +207,33 @@ const stars="★".repeat(row.Rating||0);
 
 tableBody.innerHTML+=`
 <tr>
-<td data-label="Select">
+<td>
 <input type="checkbox" class="row-checkbox" value="${row.id}" onchange="toggleDeleteButton()">
 </td>
-<td data-label="ID">${row.id}</td>
-<td data-label="Hospital">${row.HospitalName}</td>
-<td data-label="Patient">${row.PatientName}</td>
-<td data-label="Issue">${row.PatientIssue}</td>
-<td data-label="Feedback">${row.PatientFeedback}</td>
-<td data-label="Rating" class="star">${stars}</td>
-<td data-label="Status">
+<td>${row.id}</td>
+<td>${row.HospitalName}</td>
+<td>${row.PatientName}</td>
+<td>${row.PatientIssue}</td>
+<td>${row.PatientFeedback}</td>
+<td style="color:#ff4da6">${stars}</td>
+<td>
 <select class="status-select" onchange="updateStatus(${row.id},this.value)">
 <option value="Pending" ${row.FeedbackStatus=="Pending"?"selected":""}>Pending</option>
 <option value="In Progress" ${row.FeedbackStatus=="In Progress"?"selected":""}>In Progress</option>
 <option value="Solved" ${row.FeedbackStatus=="Solved"?"selected":""}>Solved</option>
 </select>
 </td>
+<td>
+<button class="download-btn" onclick='downloadPDF(${JSON.stringify(row)})'>
+Download
+</button>
+</td>
 </tr>
 `;
 }
-
 });
 
 document.getElementById("deleteBtn").style.display="none";
-}
-
-function switchTab(status,btn){
-currentStatus=status;
-document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
-btn.classList.add("active");
-loadFeedback();
-}
-
-function filterRating(rating,btn){
-currentRating=rating;
-document.querySelectorAll(".rating-btn").forEach(b=>b.classList.remove("active"));
-btn.classList.add("active");
-loadFeedback();
 }
 
 function toggleDeleteButton(){
@@ -334,11 +263,115 @@ loadFeedback();
 }
 }
 
+function switchTab(status,btn){
+currentStatus=status;
+document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+btn.classList.add("active");
+loadFeedback();
+}
+
 async function updateStatus(id,newStatus){
 await supabaseClient.from("Feedback")
 .update({FeedbackStatus:newStatus})
 .eq("id",id);
 loadFeedback();
+}
+
+function downloadPDF(row){
+
+const doc = new jsPDF({
+  orientation: "landscape",
+  unit: "mm",
+  format: "a4"
+});
+
+const today = new Date().toLocaleDateString();
+const pageWidth = doc.internal.pageSize.getWidth();
+
+/* ====== HEADER ====== */
+doc.setFillColor(102, 0, 153); // deep hospital purple
+doc.rect(0, 0, pageWidth, 30, "F");
+
+doc.setFont("helvetica","bold");
+doc.setFontSize(24);
+doc.setTextColor(255,255,255);
+doc.text("HOSPITAL FEEDBACK REPORT", 14, 18);
+
+doc.setFontSize(12);
+doc.text(`Generated on: ${today}`, pageWidth - 70, 18);
+
+/* ====== CARD BACKGROUND ====== */
+doc.setFillColor(245, 240, 255);
+doc.roundedRect(10, 40, pageWidth-20, 45, 5, 5, "F");
+
+/* ====== HOSPITAL INFO ====== */
+doc.setTextColor(102,0,153);
+doc.setFontSize(16);
+doc.text("Hospital Information", 15, 50);
+
+doc.setTextColor(0,0,0);
+doc.setFont("helvetica","normal");
+doc.setFontSize(13);
+
+doc.text(`Hospital Name: ${row.HospitalName}`, 15, 60);
+doc.text(`Patient Name: ${row.PatientName}`, 15, 68);
+doc.text(`Status: ${row.FeedbackStatus}`, 15, 76);
+
+/* ====== STAR RATING ====== */
+let startX = 15;
+let startY = 85;
+
+doc.setFontSize(16);
+doc.setTextColor(255, 193, 7); // gold stars
+
+for(let i=1; i<=5; i++){
+  if(i <= row.Rating){
+    doc.text("*", startX, startY);
+  } else {
+    doc.setTextColor(200,200,200);
+    doc.text("*", startX, startY);
+    doc.setTextColor(255,193,7);
+  }
+  startX += 8;
+}
+
+/* ====== ISSUE SECTION ====== */
+doc.setFillColor(255, 230, 240);
+doc.roundedRect(10, 95, pageWidth-20, 45, 5, 5, "F");
+
+doc.setTextColor(214,51,132);
+doc.setFontSize(16);
+doc.text("Patient Issue", 15, 105);
+
+doc.setFontSize(13);
+doc.setTextColor(0,0,0);
+
+const issueLines = doc.splitTextToSize(row.PatientIssue, pageWidth-30);
+doc.text(issueLines, 15, 115);
+
+/* ====== FEEDBACK SECTION ====== */
+doc.setFillColor(230, 255, 250);
+doc.roundedRect(10, 150, pageWidth-20, 45, 5, 5, "F");
+
+doc.setTextColor(0,150,136);
+doc.setFontSize(16);
+doc.text("Patient Feedback", 15, 160);
+
+doc.setFontSize(13);
+doc.setTextColor(0,0,0);
+
+const feedbackLines = doc.splitTextToSize(row.PatientFeedback, pageWidth-30);
+doc.text(feedbackLines, 15, 170);
+
+/* ====== FOOTER ====== */
+doc.setDrawColor(180,180,180);
+doc.line(10, 195, pageWidth-10, 195);
+
+doc.setFontSize(10);
+doc.setTextColor(120,120,120);
+doc.text("Confidential Hospital Document • Authorized Admin Use Only", 15, 202);
+
+doc.save(`Hospital_Feedback_${row.id}.pdf`);
 }
 
 function logout(){
